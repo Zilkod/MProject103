@@ -1,0 +1,123 @@
+
+kind: pipeline
+type: docker
+name: nuxt-boilerplate
+trigger:
+  event:
+    include:
+      - push
+    exclude:
+      - tag
+      - pull_request
+
+steps:
+  # - name: pre-slack-notifications
+  #   image: plugins/slack
+  #   settings:
+  #     webhook:
+  #       from_secret: slack_webhook
+  #     template: >
+  #       *🏁 CI Begin for Build {{build.number}}*
+
+  #       *Project: * {{ repo.name }}
+
+  #       *Commit Message:* ${DRONE_COMMIT_MESSAGE:0:122}
+
+  #       *Commit ID:* <https://github.com/{{ repo.owner }}/{{ repo.name }}/commit/{{ build.commit }}|{{ truncate build.commit 8 }}>
+
+  #       *Branch:* <https://github.com/{{ repo.owner }}/{{ repo.name }}/commits/{{ build.branch }}|{{ build.branch }}>
+
+  #       *Author:* {{ build.author }}
+
+  #       <{{ build.link }}|Visit build page ↗>
+  #   when:
+  #     event:
+  #       include:
+  #       - push
+  #       exclude:
+  #       - tag
+  #       - pull_request
+
+  - name: install
+    image: node:12-alpine
+    commands:
+    - cd app
+    - npm ci 
+    when:
+      event:
+        include:
+        - push
+        exclude:
+        - tag
+        - pull_request
+  
+  - name: test
+    image: node:12-alpine
+    commands: 
+      - cd app
+      - npm run test
+      - echo -n "${DRONE_COMMIT_BRANCH}-${DRONE_COMMIT_SHA:0:8}" > .tags
+    when:
+      event:
+        include:
+        - push
+        exclude:
+        - tag
+        - pull_request
+
+  - name: docker
+    image: plugins/docker
+    settings:
+      username: 
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      repo: improwised/webauditor-ui
+      build_args:
+        - MODE=staging
+      dockerfile: ./app/Dockerfile
+      context: ./app/.
+    when:
+      event:
+        include:
+        - push
+        exclude:
+        - tag
+        - pull_request
+      branch:
+        include:
+        - develop
+        - master
+        - docker
+        exclude:
+        - feature/*
+        - hotfix/*
+  
+  # - name: post-slack-notification
+  #   image: plugins/slack
+  #   settings:
+  #     webhook:
+  #       from_secret: slack_webhook
+  #     template:  >
+  #       *{{#success build.status}}🎉{{ else }}✘{{/success}} {{ uppercasefirst build.status }}: Build #{{ build.number }}* (type: `{{ build.event }}`)
+
+  #       *Project: * {{ repo.name }}
+
+  #       *Commit Message:* ${DRONE_COMMIT_MESSAGE:0:122}
+
+  #       *Commit ID:* <https://github.com/{{ repo.owner }}/{{ repo.name }}/commit/{{ build.commit }}|{{ truncate build.commit 8 }}>
+
+  #       *Branch:* <https://github.com/{{ repo.owner }}/{{ repo.name }}/commits/{{ build.branch }}|{{ build.branch }}>
+
+  #       *Author:* {{ build.author }}
+
+  #       <{{ build.link }}|Visit build page ↗>
+  #   when:
+  #     status: [success, failure]
+  #     event:
+  #       include:
+  #       - push
+  #       exclude:
+  #       - tag
+  #       - pull_request
+    
